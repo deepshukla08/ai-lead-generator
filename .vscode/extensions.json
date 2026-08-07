@@ -7,7 +7,7 @@
     "dbaeumer.vscode-eslint",
     "esbenp.prettier-vscode",
     "bradlc.vscode-tailwindcss",
-    "ckolkman.vscode-postgres",
+    "ms-ossdata.vscode-pgsql",
     "humao.rest-client",
     "bierner.markdown-mermaid"
   ]
