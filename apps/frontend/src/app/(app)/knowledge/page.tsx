@@ -114,8 +114,8 @@ export default function KnowledgePage() {
               <div className="p-10 text-center">
                 <p className="text-sm font-medium">No documents yet</p>
                 <p className="text-muted-foreground mt-1 text-sm">
-                  Drop files here, or use Add document. Without them the AI has nothing to base
-                  its claims on.
+                  Drop files here, or use Add document. Without them the AI has nothing to base its
+                  claims on.
                 </p>
               </div>
             )}

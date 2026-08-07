@@ -31,13 +31,7 @@ const STATUS_LABEL: Record<KnowledgeSourceStatus, string> = {
   failed: "failed",
 };
 
-export function SourceRow({
-  source,
-  companyId,
-}: {
-  source: KnowledgeSource;
-  companyId: string;
-}) {
+export function SourceRow({ source, companyId }: { source: KnowledgeSource; companyId: string }) {
   const queryClient = useQueryClient();
   const [confirming, setConfirming] = useState(false);
 
@@ -63,9 +57,7 @@ export function SourceRow({
         </p>
       </div>
 
-      <span className={`text-xs ${STATUS_TONE[source.status]}`}>
-        {STATUS_LABEL[source.status]}
-      </span>
+      <span className={`text-xs ${STATUS_TONE[source.status]}`}>{STATUS_LABEL[source.status]}</span>
 
       <Button
         variant="ghost"
@@ -83,8 +75,8 @@ export function SourceRow({
           <DialogHeader>
             <DialogTitle>Remove this document?</DialogTitle>
             <DialogDescription>
-              {source.original_filename} and everything the AI learned from it will be deleted.
-              This cannot be undone.
+              {source.original_filename} and everything the AI learned from it will be deleted. This
+              cannot be undone.
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
