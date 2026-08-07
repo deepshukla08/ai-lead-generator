@@ -74,6 +74,58 @@ def test_oversized_upload_is_rejected(client) -> None:
     assert response.status_code in (413, 422)
 
 
+def test_edit_profile_updates_only_the_fields_sent(client) -> None:
+    company = _create_company(client, "Editable Co")
+
+    response = client.patch(
+        f"/api/v1/companies/{company['id']}",
+        json={"description": "Rewritten description."},
+    )
+    assert response.status_code == 200, response.text
+    updated = response.json()
+    assert updated["description"] == "Rewritten description."
+    # Untouched fields survive a partial update.
+    assert updated["name"] == "Editable Co"
+    assert updated["icp_description"] == company["icp_description"]
+
+
+def test_delete_removes_the_source_and_its_file(client, tmp_path) -> None:
+    company = _create_company(client, "Deletable Co")
+    created = client.post(
+        f"/api/v1/companies/{company['id']}/knowledge-sources",
+        data={"kind": "brochure"},
+        files={"file": PDF},
+    ).json()
+
+    stored = list(tmp_path.rglob("*.pdf"))
+    assert len(stored) == 1
+
+    response = client.delete(
+        f"/api/v1/companies/{company['id']}/knowledge-sources/{created['id']}"
+    )
+    assert response.status_code == 204
+
+    assert list(tmp_path.rglob("*.pdf")) == []
+    listed = client.get(f"/api/v1/companies/{company['id']}/knowledge-sources").json()
+    assert listed == []
+
+
+def test_deleting_a_source_from_another_company_is_404(client) -> None:
+    """The id alone must not be enough — it has to belong to that company."""
+    owner = _create_company(client, "Owner Co")
+    other = _create_company(client, "Other Co")
+    source = client.post(
+        f"/api/v1/companies/{owner['id']}/knowledge-sources",
+        data={"kind": "brochure"},
+        files={"file": PDF},
+    ).json()
+
+    response = client.delete(
+        f"/api/v1/companies/{other['id']}/knowledge-sources/{source['id']}"
+    )
+    assert response.status_code == 404
+
+
 def test_upload_to_an_unknown_company_is_404(client) -> None:
     response = client.post(
         "/api/v1/companies/00000000-0000-0000-0000-0000000000ff/knowledge-sources",

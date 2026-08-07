@@ -124,6 +124,27 @@ async def upload_knowledge_source(
     return KnowledgeSourceRead.model_validate(source)
 
 
+@router.delete(
+    "/{profile_id}/knowledge-sources/{source_id}", status_code=status.HTTP_204_NO_CONTENT
+)
+async def delete_knowledge_source(
+    profile_id: uuid.UUID,
+    source_id: uuid.UUID,
+    session: SessionDep,
+    settings: SettingsDep,
+    storage: StorageDep,
+) -> None:
+    source = await service.get_knowledge_source(
+        session,
+        source_id,
+        company_profile_id=profile_id,
+        workspace_id=settings.workspace_id,
+    )
+    if source is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "knowledge source not found")
+    await service.delete_knowledge_source(session, storage, source)
+
+
 @router.get("/{profile_id}/knowledge-sources", response_model=list[KnowledgeSourceRead])
 async def list_knowledge_sources(
     profile_id: uuid.UUID, session: SessionDep, settings: SettingsDep

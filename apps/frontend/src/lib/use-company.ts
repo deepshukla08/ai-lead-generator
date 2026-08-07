@@ -1,10 +1,11 @@
 "use client";
 
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { toast } from "sonner";
 
-import { api } from "@/lib/api";
+import { api, uploadFile } from "@/lib/api";
 import { useSession } from "@/lib/store";
-import type { CompanyProfile } from "@/lib/types";
+import type { CompanyProfile, KnowledgeSource, KnowledgeSourceKind } from "@/lib/types";
 
 export function useCompanies() {
   return useQuery({
@@ -27,4 +28,22 @@ export function useActiveCompany() {
   const company = companies?.find((c) => c.id === activeCompanyId) ?? companies?.[0] ?? null;
 
   return { company, companies: companies ?? [], ...query };
+}
+
+/**
+ * Shared by the upload button and the drop target, so both report success the
+ * same way and neither can drift from the other.
+ */
+export function useUploadKnowledgeSource(companyId: string) {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({ file, kind }: { file: File; kind: KnowledgeSourceKind }) =>
+      uploadFile<KnowledgeSource>(`/companies/${companyId}/knowledge-sources`, file, kind),
+    onSuccess: async (source) => {
+      await queryClient.invalidateQueries({ queryKey: ["companies"] });
+      toast.success(`${source.original_filename} uploaded — queued for parsing`);
+    },
+    onError: (error: Error) => toast.error(error.message),
+  });
 }

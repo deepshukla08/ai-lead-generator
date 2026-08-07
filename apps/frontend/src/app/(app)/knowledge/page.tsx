@@ -1,13 +1,16 @@
 "use client";
 
-import { FileText, Loader2 } from "lucide-react";
+import { Loader2 } from "lucide-react";
 import Link from "next/link";
 
+import { CompanyEditor } from "@/components/company-editor";
+import { KnowledgeDropZone, KnowledgeUploader } from "@/components/knowledge-uploader";
 import { PageHeader } from "@/components/page-header";
+import { SourceRow } from "@/components/source-row";
 import { Badge } from "@/components/ui/badge";
 import { buttonVariants } from "@/components/ui/button";
 import { MOCK_PRODUCT_KNOWLEDGE } from "@/lib/mock";
-import type { KnowledgeSourceStatus, ProductKnowledge } from "@/lib/types";
+import type { ProductKnowledge } from "@/lib/types";
 import { useActiveCompany } from "@/lib/use-company";
 
 const SECTIONS: { key: keyof ProductKnowledge; label: string }[] = [
@@ -23,13 +26,6 @@ const SECTIONS: { key: keyof ProductKnowledge; label: string }[] = [
   { key: "use_cases", label: "Use cases" },
   { key: "value_props", label: "Value propositions" },
 ];
-
-const SOURCE_TONE: Record<KnowledgeSourceStatus, string> = {
-  pending: "text-muted-foreground",
-  parsing: "text-blue-700 dark:text-blue-300",
-  ready: "text-emerald-700 dark:text-emerald-300",
-  failed: "text-red-700 dark:text-red-300",
-};
 
 export default function KnowledgePage() {
   const { company: profile, isPending, error } = useActiveCompany();
@@ -72,7 +68,10 @@ export default function KnowledgePage() {
 
       <div className="space-y-8 p-8">
         <section className="rounded-lg border p-5">
-          <h2 className="font-medium">{profile.name}</h2>
+          <div className="mb-1 flex items-start justify-between gap-4">
+            <h2 className="font-medium">{profile.name}</h2>
+            <CompanyEditor profile={profile} />
+          </div>
           {profile.website && (
             <a
               href={profile.website}
@@ -95,33 +94,32 @@ export default function KnowledgePage() {
         </section>
 
         <section>
-          <h2 className="mb-3 font-medium">
-            Sources{" "}
-            <span className="text-muted-foreground font-normal">
-              ({profile.sources?.length ?? 0})
-            </span>
-          </h2>
-          {profile.sources && profile.sources.length > 0 ? (
-            <ul className="divide-y rounded-lg border">
-              {profile.sources.map((source) => (
-                <li key={source.id} className="flex items-center gap-3 p-4">
-                  <FileText className="text-muted-foreground size-4 shrink-0" />
-                  <div className="min-w-0 flex-1">
-                    <p className="truncate text-sm">{source.original_filename}</p>
-                    <p className="text-muted-foreground text-xs capitalize">
-                      {source.kind.replace("_", " ")} ·{" "}
-                      {source.size_bytes ? `${Math.round(source.size_bytes / 1024)} KB` : "—"}
-                    </p>
-                  </div>
-                  <span className={`text-xs ${SOURCE_TONE[source.status]}`}>{source.status}</span>
-                </li>
-              ))}
-            </ul>
-          ) : (
-            <p className="text-muted-foreground rounded-lg border p-8 text-center text-sm">
-              No documents uploaded yet.
-            </p>
-          )}
+          <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
+            <h2 className="font-medium">
+              Sources{" "}
+              <span className="text-muted-foreground font-normal">
+                ({profile.sources?.length ?? 0})
+              </span>
+            </h2>
+            <KnowledgeUploader companyId={profile.id} />
+          </div>
+          <KnowledgeDropZone companyId={profile.id}>
+            {profile.sources && profile.sources.length > 0 ? (
+              <ul className="divide-y">
+                {profile.sources.map((source) => (
+                  <SourceRow key={source.id} source={source} companyId={profile.id} />
+                ))}
+              </ul>
+            ) : (
+              <div className="p-10 text-center">
+                <p className="text-sm font-medium">No documents yet</p>
+                <p className="text-muted-foreground mt-1 text-sm">
+                  Drop files here, or use Add document. Without them the AI has nothing to base
+                  its claims on.
+                </p>
+              </div>
+            )}
+          </KnowledgeDropZone>
         </section>
 
         <section>

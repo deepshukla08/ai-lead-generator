@@ -33,6 +33,12 @@ export async function api<T>(path: string, init?: RequestInit): Promise<T> {
   return response.json() as Promise<T>;
 }
 
+/** DELETE returns 204 with no body, so it cannot go through `api`'s json parse. */
+export async function del(path: string): Promise<void> {
+  const response = await fetch(`${BASE_URL}/api/v1${path}`, { method: "DELETE" });
+  if (!response.ok) throw await toError(response, "DELETE", path);
+}
+
 /**
  * Multipart upload. Deliberately separate from `api`: setting Content-Type by
  * hand on a FormData body strips the boundary and the server rejects it.

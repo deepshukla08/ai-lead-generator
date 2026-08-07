@@ -50,6 +50,11 @@ async def update_profile(
     for field, value in data.items():
         setattr(profile, field, value)
     await session.flush()
+    # `updated_at` is server-computed (onupdate plus the DB trigger), so
+    # SQLAlchemy expires it after the UPDATE. Refreshing here loads it eagerly;
+    # without this, serialising the response triggers lazy IO outside the async
+    # context and raises MissingGreenlet.
+    await session.refresh(profile)
     return profile
 
 
@@ -151,3 +156,41 @@ async def add_knowledge_source(
     )
     # TODO(phase-3): enqueue the parse + embed job here.
     return source
+
+
+async def get_knowledge_source(
+    session: AsyncSession,
+    source_id: uuid.UUID,
+    *,
+    company_profile_id: uuid.UUID,
+    workspace_id: uuid.UUID,
+) -> KnowledgeSource | None:
+    """Scoped by company *and* workspace, so an id from one cannot reach another."""
+    result = await session.execute(
+        select(KnowledgeSource).where(
+            KnowledgeSource.id == source_id,
+            KnowledgeSource.company_profile_id == company_profile_id,
+            KnowledgeSource.workspace_id == workspace_id,
+        )
+    )
+    return result.scalar_one_or_none()
+
+
+async def delete_knowledge_source(
+    session: AsyncSession, storage: Storage, source: KnowledgeSource
+) -> None:
+    """Remove the row and the file.
+
+    The row goes first: the transaction can still roll it back, whereas a
+    deleted file cannot be un-deleted. A file left behind after a failed commit
+    is wasted disk; a row pointing at a missing file breaks every later read.
+    Chunks follow via ON DELETE CASCADE.
+    """
+    storage_key = source.storage_key
+    await session.delete(source)
+    await session.flush()
+
+    if storage_key:
+        await storage.delete(storage_key)
+
+    log.info("knowledge_source.deleted", knowledge_source_id=str(source.id))
