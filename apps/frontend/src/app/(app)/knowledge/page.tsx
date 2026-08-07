@@ -1,15 +1,14 @@
 "use client";
 
-import { useQuery } from "@tanstack/react-query";
 import { FileText, Loader2 } from "lucide-react";
 import Link from "next/link";
 
 import { PageHeader } from "@/components/page-header";
 import { Badge } from "@/components/ui/badge";
 import { buttonVariants } from "@/components/ui/button";
-import { api } from "@/lib/api";
 import { MOCK_PRODUCT_KNOWLEDGE } from "@/lib/mock";
-import type { CompanyProfile, KnowledgeSourceStatus, ProductKnowledge } from "@/lib/types";
+import type { KnowledgeSourceStatus, ProductKnowledge } from "@/lib/types";
+import { useActiveCompany } from "@/lib/use-company";
 
 const SECTIONS: { key: keyof ProductKnowledge; label: string }[] = [
   { key: "products", label: "Products" },
@@ -33,15 +32,7 @@ const SOURCE_TONE: Record<KnowledgeSourceStatus, string> = {
 };
 
 export default function KnowledgePage() {
-  const {
-    data: profile,
-    isPending,
-    error,
-  } = useQuery({
-    queryKey: ["company", "current"],
-    queryFn: () => api<CompanyProfile>("/companies/current"),
-    retry: false,
-  });
+  const { company: profile, isPending, error } = useActiveCompany();
 
   if (isPending) {
     return (

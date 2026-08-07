@@ -27,6 +27,16 @@ async def create_company_profile(
     return CompanyProfileRead.model_validate(profile)
 
 
+@router.get("", response_model=list[CompanyProfileWithSources])
+async def list_company_profiles(
+    session: SessionDep, settings: SettingsDep
+) -> list[CompanyProfileWithSources]:
+    """Every profile in the workspace. Backs the company switcher."""
+    profiles = await service.list_profiles(session, workspace_id=settings.workspace_id)
+    return [CompanyProfileWithSources.model_validate(p) for p in profiles]
+
+
+# Declared before /{profile_id} so "current" is never parsed as a UUID.
 @router.get("/current", response_model=CompanyProfileWithSources)
 async def read_current_company_profile(
     session: SessionDep, settings: SettingsDep
@@ -35,6 +45,16 @@ async def read_current_company_profile(
     profile = await service.get_current_profile(session, workspace_id=settings.workspace_id)
     if profile is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "no company profile yet")
+    return CompanyProfileWithSources.model_validate(profile)
+
+
+@router.get("/{profile_id}", response_model=CompanyProfileWithSources)
+async def read_company_profile(
+    profile_id: uuid.UUID, session: SessionDep, settings: SettingsDep
+) -> CompanyProfileWithSources:
+    profile = await service.get_profile(session, profile_id, workspace_id=settings.workspace_id)
+    if profile is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "company profile not found")
     return CompanyProfileWithSources.model_validate(profile)
 
 

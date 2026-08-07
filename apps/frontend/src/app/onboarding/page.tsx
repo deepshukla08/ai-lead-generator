@@ -11,6 +11,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { api, uploadFile } from "@/lib/api";
+import { useSession } from "@/lib/store";
 import type { CompanyProfile, KnowledgeSourceKind } from "@/lib/types";
 
 const UPLOAD_SLOTS: { kind: KnowledgeSourceKind; label: string; hint: string }[] = [
@@ -27,6 +28,7 @@ const UPLOAD_SLOTS: { kind: KnowledgeSourceKind; label: string; hint: string }[]
 export default function OnboardingPage() {
   const router = useRouter();
   const queryClient = useQueryClient();
+  const setActiveCompany = useSession((s) => s.setActiveCompany);
   const [files, setFiles] = useState<Partial<Record<KnowledgeSourceKind, File>>>({});
 
   const submit = useMutation({
@@ -49,7 +51,10 @@ export default function OnboardingPage() {
       return profile;
     },
     onSuccess: async (profile) => {
-      await queryClient.invalidateQueries({ queryKey: ["company"] });
+      await queryClient.invalidateQueries({ queryKey: ["companies"] });
+      // Switch to what you just created; landing on someone else's company
+      // after onboarding would be baffling.
+      setActiveCompany(profile.id);
       toast.success(`${profile.name} saved`);
       router.push("/knowledge");
     },

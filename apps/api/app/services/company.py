@@ -64,6 +64,18 @@ async def get_profile(
     return result.scalar_one_or_none()
 
 
+async def list_profiles(
+    session: AsyncSession, *, workspace_id: uuid.UUID
+) -> list[CompanyProfile]:
+    result = await session.execute(
+        select(CompanyProfile)
+        .where(CompanyProfile.workspace_id == workspace_id)
+        .options(selectinload(CompanyProfile.sources))
+        .order_by(CompanyProfile.created_at)
+    )
+    return list(result.scalars().all())
+
+
 async def get_current_profile(
     session: AsyncSession, *, workspace_id: uuid.UUID
 ) -> CompanyProfile | None:

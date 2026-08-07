@@ -10,7 +10,7 @@ import { Badge } from "@/components/ui/badge";
 import { buttonVariants } from "@/components/ui/button";
 import { api } from "@/lib/api";
 import { MOCK_CAMPAIGNS, MOCK_DRAFTS, MOCK_LEADS, MOCK_TIMELINE } from "@/lib/mock";
-import type { CompanyProfile } from "@/lib/types";
+import { useActiveCompany } from "@/lib/use-company";
 
 type Readiness = { status: string; checks: Record<string, string> };
 
@@ -41,12 +41,8 @@ function SystemStatus() {
 }
 
 export default function DashboardPage() {
-  // Real: the company profile comes from the API. 404 simply means not onboarded.
-  const { data: profile } = useQuery({
-    queryKey: ["company", "current"],
-    queryFn: () => api<CompanyProfile>("/companies/current"),
-    retry: false,
-  });
+  // Real: whichever company the switcher has selected.
+  const { company: profile } = useActiveCompany();
 
   const qualified = MOCK_LEADS.filter((l) => (l.fit_score ?? 0) >= 85).length;
   const pending = MOCK_DRAFTS.filter((d) => d.status === "pending").length;
