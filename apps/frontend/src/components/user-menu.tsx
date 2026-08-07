@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import {
   DropdownMenu,
   DropdownMenuContent,
+  DropdownMenuGroup,
   DropdownMenuItem,
   DropdownMenuLabel,
   DropdownMenuSeparator,
@@ -30,10 +31,13 @@ export function UserMenu() {
       </DropdownMenuTrigger>
 
       <DropdownMenuContent align="start" className="w-56">
-        <DropdownMenuLabel className="font-normal">
-          <p className="text-sm">Deep Shukla</p>
-          <p className="text-muted-foreground text-xs">Demo account — no authentication</p>
-        </DropdownMenuLabel>
+        {/* Base UI requires a Group around a GroupLabel. */}
+        <DropdownMenuGroup>
+          <DropdownMenuLabel className="font-normal">
+            <p className="text-sm">Deep Shukla</p>
+            <p className="text-muted-foreground text-xs">Demo account — no authentication</p>
+          </DropdownMenuLabel>
+        </DropdownMenuGroup>
         <DropdownMenuSeparator />
         <DropdownMenuItem className="gap-2" disabled>
           <Settings className="size-3.5" /> Settings

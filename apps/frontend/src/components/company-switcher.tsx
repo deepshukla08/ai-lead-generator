@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import {
   DropdownMenu,
   DropdownMenuContent,
+  DropdownMenuGroup,
   DropdownMenuItem,
   DropdownMenuLabel,
   DropdownMenuSeparator,
@@ -37,22 +38,27 @@ export function CompanySwitcher() {
       </DropdownMenuTrigger>
 
       <DropdownMenuContent align="start" className="w-56">
-        <DropdownMenuLabel className="text-muted-foreground text-xs">Companies</DropdownMenuLabel>
-        {companies.map((option) => (
-          <DropdownMenuItem
-            key={option.id}
-            onClick={() => setActiveCompany(option.id)}
-            className="gap-2"
-          >
-            <Check
-              className={option.id === company?.id ? "size-3.5 opacity-100" : "size-3.5 opacity-0"}
-            />
-            <span className="truncate">{option.name}</span>
-          </DropdownMenuItem>
-        ))}
-        {companies.length === 0 && (
-          <p className="text-muted-foreground px-2 py-1.5 text-sm">None yet</p>
-        )}
+        {/* Base UI requires a Group around a GroupLabel. */}
+        <DropdownMenuGroup>
+          <DropdownMenuLabel className="text-muted-foreground text-xs">Companies</DropdownMenuLabel>
+          {companies.map((option) => (
+            <DropdownMenuItem
+              key={option.id}
+              onClick={() => setActiveCompany(option.id)}
+              className="gap-2"
+            >
+              <Check
+                className={
+                  option.id === company?.id ? "size-3.5 opacity-100" : "size-3.5 opacity-0"
+                }
+              />
+              <span className="truncate">{option.name}</span>
+            </DropdownMenuItem>
+          ))}
+          {companies.length === 0 && (
+            <p className="text-muted-foreground px-2 py-1.5 text-sm">None yet</p>
+          )}
+        </DropdownMenuGroup>
         <DropdownMenuSeparator />
         <DropdownMenuItem onClick={() => router.push("/onboarding")} className="gap-2">
           <Plus className="size-3.5" />
