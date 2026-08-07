@@ -1,0 +1,6 @@
+# Normalise to LF in the repo. Files are bind-mounted into Linux containers,
+# where CRLF breaks shell scripts and entrypoints.
+* text=auto eol=lf
+*.png binary
+*.ico binary
+*.svg text eol=lf

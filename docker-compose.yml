@@ -1,0 +1,122 @@
+name: agentsdr
+
+# The frontend is deliberately NOT in here. Next.js dev-server hot reload over a
+# Windows bind mount is slow and flaky; run it on the host with `npm run dev`.
+# apps/frontend/Dockerfile exists for production builds.
+
+services:
+  postgres:
+    image: pgvector/pgvector:pg16
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-agentsdr}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-agentsdr}
+      POSTGRES_DB: ${POSTGRES_DB:-agentsdr}
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./infra/postgres/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-agentsdr}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    command: redis-server --appendonly yes
+    ports:
+      - "${REDIS_PORT:-6379}:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  # Self-hosted LLM observability. v2 needs only postgres; v3 drags in
+  # ClickHouse + MinIO, which is not worth it for local development.
+  langfuse:
+    image: langfuse/langfuse:2
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-agentsdr}:${POSTGRES_PASSWORD:-agentsdr}@postgres:5432/langfuse
+      NEXTAUTH_URL: http://localhost:${LANGFUSE_PORT:-3001}
+      NEXTAUTH_SECRET: ${LANGFUSE_NEXTAUTH_SECRET:?set LANGFUSE_NEXTAUTH_SECRET in .env}
+      SALT: ${LANGFUSE_SALT:?set LANGFUSE_SALT in .env}
+      ENCRYPTION_KEY: ${LANGFUSE_ENCRYPTION_KEY:?set LANGFUSE_ENCRYPTION_KEY in .env}
+      TELEMETRY_ENABLED: "false"
+      NEXT_PUBLIC_SIGN_UP_DISABLED: "false"
+    ports:
+      - "${LANGFUSE_PORT:-3001}:3000"
+
+  api:
+    build:
+      context: .
+      dockerfile: apps/api/Dockerfile
+    env_file: .env
+    environment:
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-agentsdr}:${POSTGRES_PASSWORD:-agentsdr}@postgres:5432/${POSTGRES_DB:-agentsdr}
+      REDIS_URL: redis://redis:6379/0
+      AI_SERVICE_URL: http://ai-service:8001
+      LANGFUSE_HOST: http://langfuse:3000
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    ports:
+      - "${API_PORT:-8000}:8000"
+    volumes:
+      - ./apps/api:/srv/apps/api
+      - ./packages/shared:/srv/packages/shared
+      - ./storage:/data/storage
+
+  ai-service:
+    build:
+      context: .
+      dockerfile: apps/ai-service/Dockerfile
+    env_file: .env
+    environment:
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-agentsdr}:${POSTGRES_PASSWORD:-agentsdr}@postgres:5432/${POSTGRES_DB:-agentsdr}
+      REDIS_URL: redis://redis:6379/0
+      LANGFUSE_HOST: http://langfuse:3000
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    ports:
+      - "${AI_SERVICE_PORT:-8001}:8001"
+    volumes:
+      - ./apps/ai-service:/srv/apps/ai-service
+      - ./packages/shared:/srv/packages/shared
+      - ./storage:/data/storage
+      - model_cache:/models
+
+  worker:
+    build:
+      context: .
+      dockerfile: apps/worker/Dockerfile
+    env_file: .env
+    environment:
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-agentsdr}:${POSTGRES_PASSWORD:-agentsdr}@postgres:5432/${POSTGRES_DB:-agentsdr}
+      REDIS_URL: redis://redis:6379/0
+      AI_SERVICE_URL: http://ai-service:8001
+    depends_on:
+      redis:
+        condition: service_healthy
+      ai-service:
+        condition: service_started
+    volumes:
+      - ./apps/worker:/srv/apps/worker
+      - ./packages/shared:/srv/packages/shared
+      - ./storage:/data/storage
+
+volumes:
+  postgres_data:
+  redis_data:
+  model_cache:
