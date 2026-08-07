@@ -69,9 +69,7 @@ class Research(UUIDPrimaryKey, WorkspaceScoped, Timestamped, Base):
     """
 
     __tablename__ = "research"
-    __table_args__ = (
-        Index("ix_research_company_created", "prospect_company_id", "created_at"),
-    )
+    __table_args__ = (Index("ix_research_company_created", "prospect_company_id", "created_at"),)
 
     prospect_company_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True),
@@ -86,9 +84,7 @@ class Research(UUIDPrimaryKey, WorkspaceScoped, Timestamped, Base):
     )
     # Every URL the agent actually read. The no-hallucination rule is only
     # enforceable if the evidence is stored next to the claim.
-    sources: Mapped[list[Any]] = mapped_column(
-        nullable=False, server_default=text("'[]'::jsonb")
-    )
+    sources: Mapped[list[Any]] = mapped_column(nullable=False, server_default=text("'[]'::jsonb"))
 
     model: Mapped[str | None] = mapped_column(String(128))
     langfuse_trace_id: Mapped[str | None] = mapped_column(String(128))

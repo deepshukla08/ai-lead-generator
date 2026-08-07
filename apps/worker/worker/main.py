@@ -1,13 +1,16 @@
 """ARQ worker entrypoint.
 
-The worker never imports the AI service. It calls it over HTTP, so the two can
-be scaled, deployed and crashed independently. Jobs are enqueued by the API.
+The worker never imports the AI service and never touches the database. It
+calls both over HTTP, so the three can be scaled, deployed and crashed
+independently.
 """
 
 from arq.connections import RedisSettings
 from shared import configure_logging, get_logger
 
 from worker.config import get_settings
+from worker.fetching import UnsafeUrl
+from worker.scraper import crawl, publish_pages
 
 settings = get_settings()
 configure_logging(
@@ -24,8 +27,24 @@ async def ping(_ctx: dict, message: str = "pong") -> str:
     return message
 
 
+async def scrape_website(
+    _ctx: dict, company_id: str, url: str, max_pages: int = 15
+) -> dict[str, object]:
+    """Crawl a company's own site and file each page as a knowledge source."""
+    log.info("scrape.start", company_id=company_id, url=url, max_pages=max_pages)
+    try:
+        pages = await crawl(url, max_pages=max_pages)
+    except UnsafeUrl as exc:
+        log.warning("scrape.rejected", url=url, reason=str(exc))
+        return {"pages_found": 0, "pages_published": 0, "error": str(exc)}
+
+    published = await publish_pages(settings.api_url, company_id, pages)
+    log.info("scrape.done", company_id=company_id, found=len(pages), published=published)
+    return {"pages_found": len(pages), "pages_published": published}
+
+
 async def startup(_ctx: dict) -> None:
-    log.info("worker.startup", ai_service_url=settings.ai_service_url)
+    log.info("worker.startup", api_url=settings.api_url, ai_service_url=settings.ai_service_url)
 
 
 async def shutdown(_ctx: dict) -> None:
@@ -33,7 +52,7 @@ async def shutdown(_ctx: dict) -> None:
 
 
 class WorkerSettings:
-    functions = [ping]
+    functions = [ping, scrape_website]  # noqa: RUF012 - arq reads this as config
     on_startup = startup
     on_shutdown = shutdown
     redis_settings = RedisSettings.from_dsn(settings.redis_url)

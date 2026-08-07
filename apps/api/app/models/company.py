@@ -125,8 +125,6 @@ class KnowledgeChunk(UUIDPrimaryKey, WorkspaceScoped, Timestamped, Base):
 
     # Page number, section heading, sheet name — whatever the parser can give us
     # so a generated claim can cite where it came from.
-    meta: Mapped[dict[str, Any]] = mapped_column(
-        nullable=False, server_default=text("'{}'::jsonb")
-    )
+    meta: Mapped[dict[str, Any]] = mapped_column(nullable=False, server_default=text("'{}'::jsonb"))
 
     source: Mapped[KnowledgeSource] = relationship(back_populates="chunks")

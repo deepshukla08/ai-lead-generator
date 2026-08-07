@@ -59,9 +59,20 @@ class LocalStorage:
             await path.unlink()
 
 
-def get_storage(settings: ApiSettings | None = None) -> Storage:
+def build_storage(settings: ApiSettings) -> Storage:
     """Injection point. When S3 lands it is another branch here, nothing else."""
-    settings = settings or get_settings()
     if settings.storage_backend == "local":
         return LocalStorage(settings.storage_local_path)
     raise ValueError(f"unsupported STORAGE_BACKEND: {settings.storage_backend!r}")
+
+
+def get_storage() -> Storage:
+    """FastAPI dependency — deliberately zero-argument.
+
+    A parameter annotated with a Pydantic model (ApiSettings) is read by FastAPI
+    as a request *body field*, not as configuration. That silently turns any
+    route depending on this into a two-body-parameter route, and FastAPI then
+    embeds both, so `{"content": ...}` starts failing with "field required:
+    payload". Keep the signature empty.
+    """
+    return build_storage(get_settings())

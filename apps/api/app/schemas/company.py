@@ -29,6 +29,23 @@ class CompanyProfileUpdate(BaseModel):
     icp_description: str | None = Field(default=None, max_length=10_000)
 
 
+class ScrapeRequest(BaseModel):
+    """Defaults to the company's own website when no URL is given."""
+
+    url: HttpUrl | None = None
+    max_pages: int = Field(default=15, ge=1, le=50)
+
+
+class ScrapeAccepted(BaseModel):
+    job_id: str
+    url: str
+    max_pages: int
+
+
+class SourceContent(BaseModel):
+    content: str = Field(max_length=2_000_000)
+
+
 class KnowledgeSourceRead(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 

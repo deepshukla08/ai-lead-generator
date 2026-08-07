@@ -69,9 +69,7 @@ async def get_profile(
     return result.scalar_one_or_none()
 
 
-async def list_profiles(
-    session: AsyncSession, *, workspace_id: uuid.UUID
-) -> list[CompanyProfile]:
+async def list_profiles(session: AsyncSession, *, workspace_id: uuid.UUID) -> list[CompanyProfile]:
     result = await session.execute(
         select(CompanyProfile)
         .where(CompanyProfile.workspace_id == workspace_id)
@@ -124,15 +122,14 @@ async def add_knowledge_source(
     filename: str,
     content_type: str | None,
     data: bytes,
+    source_url: str | None = None,
 ) -> KnowledgeSource:
     """Persist an uploaded document and register it for parsing.
 
     Storage first, row second: an orphaned file wastes disk, whereas a row
     pointing at a file that was never written breaks every later read.
     """
-    key = build_key(
-        workspace_id=profile.workspace_id, company_id=profile.id, filename=filename
-    )
+    key = build_key(workspace_id=profile.workspace_id, company_id=profile.id, filename=filename)
     await storage.save(key, data)
 
     source = KnowledgeSource(
@@ -140,6 +137,7 @@ async def add_knowledge_source(
         company_profile_id=profile.id,
         kind=kind,
         original_filename=filename,
+        source_url=source_url,
         storage_key=key,
         mime_type=content_type,
         size_bytes=len(data),
@@ -174,6 +172,40 @@ async def get_knowledge_source(
         )
     )
     return result.scalar_one_or_none()
+
+
+async def read_source_content(storage: Storage, source: KnowledgeSource) -> str:
+    """Text of a stored source. Binary formats stay unreadable until Phase 3 parses them."""
+    if not source.storage_key:
+        return ""
+    data = await storage.read(source.storage_key)
+    return data.decode("utf-8", errors="replace")
+
+
+async def update_source_content(
+    session: AsyncSession, storage: Storage, source: KnowledgeSource, content: str
+) -> KnowledgeSource:
+    """Overwrite a source's text.
+
+    Scraped pages carry noise no extractor catches. Editing here is cheaper than
+    discovering it later in a generated email — and the status drops back to
+    pending because the old chunks no longer reflect the text.
+    """
+    if not source.storage_key:
+        raise ValueError("source has no stored content")
+
+    data = content.encode("utf-8")
+    await storage.save(source.storage_key, data)
+
+    source.size_bytes = len(data)
+    source.status = KnowledgeSourceStatus.PENDING
+    source.parsed_at = None
+    source.error = None
+    await session.flush()
+    await session.refresh(source)
+
+    log.info("knowledge_source.edited", knowledge_source_id=str(source.id), size_bytes=len(data))
+    return source
 
 
 async def delete_knowledge_source(

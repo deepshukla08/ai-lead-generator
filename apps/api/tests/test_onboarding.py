@@ -100,9 +100,7 @@ def test_delete_removes_the_source_and_its_file(client, tmp_path) -> None:
     stored = list(tmp_path.rglob("*.pdf"))
     assert len(stored) == 1
 
-    response = client.delete(
-        f"/api/v1/companies/{company['id']}/knowledge-sources/{created['id']}"
-    )
+    response = client.delete(f"/api/v1/companies/{company['id']}/knowledge-sources/{created['id']}")
     assert response.status_code == 204
 
     assert list(tmp_path.rglob("*.pdf")) == []
@@ -120,10 +118,68 @@ def test_deleting_a_source_from_another_company_is_404(client) -> None:
         files={"file": PDF},
     ).json()
 
-    response = client.delete(
-        f"/api/v1/companies/{other['id']}/knowledge-sources/{source['id']}"
-    )
+    response = client.delete(f"/api/v1/companies/{other['id']}/knowledge-sources/{source['id']}")
     assert response.status_code == 404
+
+
+def test_source_content_is_readable_and_editable(client) -> None:
+    company = _create_company(client, "Editable Content Co")
+    source = client.post(
+        f"/api/v1/companies/{company['id']}/knowledge-sources",
+        data={"kind": "website", "source_url": "https://acme.example/about"},
+        files={"file": ("about.txt", b"Original scraped text.", "text/plain")},
+    ).json()
+    assert source["source_url"] == "https://acme.example/about"
+
+    base = f"/api/v1/companies/{company['id']}/knowledge-sources/{source['id']}/content"
+    assert client.get(base).json()["content"] == "Original scraped text."
+
+    edited = client.put(base, json={"content": "Cleaned up text."})
+    assert edited.status_code == 200, edited.text
+    # Editing invalidates whatever was derived from the old text.
+    assert edited.json()["status"] == "pending"
+    assert edited.json()["size_bytes"] == len("Cleaned up text.")
+    assert client.get(base).json()["content"] == "Cleaned up text."
+
+
+def test_scrape_without_a_url_or_website_is_rejected(client) -> None:
+    response = client.post("/api/v1/companies", json={"name": "No Website Co"})
+    company = response.json()
+    scrape = client.post(f"/api/v1/companies/{company['id']}/scrape", json={})
+    assert scrape.status_code == 422
+    assert "website" in scrape.json()["detail"]
+
+
+def test_scrape_enqueues_a_job(client, monkeypatch) -> None:
+    """The endpoint must return immediately; the crawl happens in the worker."""
+    from app.api.v1.routes import companies as route
+
+    enqueued: dict[str, object] = {}
+
+    class FakeJob:
+        job_id = "job-123"
+
+    class FakeQueue:
+        async def enqueue_job(self, name, *args):
+            enqueued["name"] = name
+            enqueued["args"] = args
+            return FakeJob()
+
+    async def fake_get_queue():
+        return FakeQueue()
+
+    monkeypatch.setattr(route, "get_queue", fake_get_queue)
+
+    company = _create_company(client, "Scrapeable Co")
+    response = client.post(f"/api/v1/companies/{company['id']}/scrape", json={"max_pages": 5})
+    assert response.status_code == 202, response.text
+    assert response.json() == {
+        "job_id": "job-123",
+        "url": "https://acme.example/",
+        "max_pages": 5,
+    }
+    assert enqueued["name"] == "scrape_website"
+    assert enqueued["args"] == (company["id"], "https://acme.example/", 5)
 
 
 def test_upload_to_an_unknown_company_is_404(client) -> None:

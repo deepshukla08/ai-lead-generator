@@ -8,12 +8,14 @@ dependencies = [
     "arq>=0.26",
     "redis>=5.2",
     "httpx>=0.28",
-    "sqlalchemy[asyncio]>=2.0",
-    "asyncpg>=0.30",
+    # Main-content extraction. Strips nav, footers and cookie banners — writing
+    # that heuristic ourselves is the classic reinvented-library mistake.
+    "trafilatura>=2.0",
 ]
 
 [project.optional-dependencies]
-dev = ["pytest>=8.3", "pytest-asyncio>=0.24", "ruff>=0.8"]
+# watchfiles backs `arq --watch`, the reload used by the compose CMD.
+dev = ["pytest>=8.3", "pytest-asyncio>=0.24", "ruff>=0.8", "watchfiles>=1.0"]
 
 [build-system]
 requires = ["hatchling"]

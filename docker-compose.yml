@@ -106,10 +106,11 @@ services:
       DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-agentsdr}:${POSTGRES_PASSWORD:-agentsdr}@postgres:5432/${POSTGRES_DB:-agentsdr}
       REDIS_URL: redis://redis:6379/0
       AI_SERVICE_URL: http://ai-service:8001
+      API_URL: http://api:8000
     depends_on:
       redis:
         condition: service_healthy
-      ai-service:
+      api:
         condition: service_started
     volumes:
       - ./apps/worker:/srv/apps/worker

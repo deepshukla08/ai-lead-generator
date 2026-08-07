@@ -77,10 +77,14 @@ async def test_same_company_can_be_a_lead_in_two_campaigns(session) -> None:
     await session.commit()
 
     scores = (
-        await session.execute(
-            select(Lead.fit_score).where(Lead.prospect_company_id == company.id)
+        (
+            await session.execute(
+                select(Lead.fit_score).where(Lead.prospect_company_id == company.id)
+            )
         )
-    ).scalars().all()
+        .scalars()
+        .all()
+    )
     assert sorted(scores) == [40, 92]
 
 

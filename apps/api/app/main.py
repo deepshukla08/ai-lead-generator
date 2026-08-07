@@ -6,6 +6,7 @@ from shared import configure_logging, get_logger
 
 from app.api.v1.router import api_router
 from app.core.config import get_settings
+from app.core.queue import close_queue
 from app.db.session import engine
 
 settings = get_settings()
@@ -21,6 +22,7 @@ log = get_logger(__name__)
 async def lifespan(_: FastAPI):
     log.info("api.startup", environment=settings.environment)
     yield
+    await close_queue()
     await engine.dispose()
     log.info("api.shutdown")
 

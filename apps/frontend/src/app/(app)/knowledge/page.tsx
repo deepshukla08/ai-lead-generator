@@ -6,6 +6,7 @@ import Link from "next/link";
 import { CompanyEditor } from "@/components/company-editor";
 import { KnowledgeDropZone, KnowledgeUploader } from "@/components/knowledge-uploader";
 import { PageHeader } from "@/components/page-header";
+import { ScrapeButton } from "@/components/scrape-button";
 import { SourceRow } from "@/components/source-row";
 import { Badge } from "@/components/ui/badge";
 import { buttonVariants } from "@/components/ui/button";
@@ -101,7 +102,10 @@ export default function KnowledgePage() {
                 ({profile.sources?.length ?? 0})
               </span>
             </h2>
-            <KnowledgeUploader companyId={profile.id} />
+            <div className="flex flex-wrap items-center gap-2">
+              <ScrapeButton profile={profile} />
+              <KnowledgeUploader companyId={profile.id} />
+            </div>
           </div>
           <KnowledgeDropZone companyId={profile.id}>
             {profile.sources && profile.sources.length > 0 ? (

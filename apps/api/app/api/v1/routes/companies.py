@@ -4,6 +4,7 @@ from typing import Annotated
 from fastapi import APIRouter, File, Form, HTTPException, UploadFile, status
 
 from app.api.deps import SessionDep, SettingsDep, StorageDep
+from app.core.queue import get_queue
 from app.models.enums import KnowledgeSourceKind
 from app.schemas.company import (
     CompanyProfileCreate,
@@ -11,6 +12,9 @@ from app.schemas.company import (
     CompanyProfileUpdate,
     CompanyProfileWithSources,
     KnowledgeSourceRead,
+    ScrapeAccepted,
+    ScrapeRequest,
+    SourceContent,
 )
 from app.services import company as service
 
@@ -21,9 +25,7 @@ router = APIRouter(prefix="/companies", tags=["company"])
 async def create_company_profile(
     payload: CompanyProfileCreate, session: SessionDep, settings: SettingsDep
 ) -> CompanyProfileRead:
-    profile = await service.create_profile(
-        session, payload, workspace_id=settings.workspace_id
-    )
+    profile = await service.create_profile(session, payload, workspace_id=settings.workspace_id)
     return CompanyProfileRead.model_validate(profile)
 
 
@@ -65,9 +67,7 @@ async def update_company_profile(
     session: SessionDep,
     settings: SettingsDep,
 ) -> CompanyProfileRead:
-    profile = await service.get_profile(
-        session, profile_id, workspace_id=settings.workspace_id
-    )
+    profile = await service.get_profile(session, profile_id, workspace_id=settings.workspace_id)
     if profile is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "company profile not found")
     updated = await service.update_profile(session, profile, payload)
@@ -86,10 +86,9 @@ async def upload_knowledge_source(
     storage: StorageDep,
     kind: Annotated[KnowledgeSourceKind, Form()],
     file: Annotated[UploadFile, File()],
+    source_url: Annotated[str | None, Form()] = None,
 ) -> KnowledgeSourceRead:
-    profile = await service.get_profile(
-        session, profile_id, workspace_id=settings.workspace_id
-    )
+    profile = await service.get_profile(session, profile_id, workspace_id=settings.workspace_id)
     if profile is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "company profile not found")
 
@@ -120,8 +119,81 @@ async def upload_knowledge_source(
         filename=file.filename or "upload",
         content_type=file.content_type,
         data=data,
+        source_url=source_url,
     )
     return KnowledgeSourceRead.model_validate(source)
+
+
+@router.post(
+    "/{profile_id}/scrape",
+    response_model=ScrapeAccepted,
+    status_code=status.HTTP_202_ACCEPTED,
+)
+async def scrape_company_website(
+    profile_id: uuid.UUID,
+    payload: ScrapeRequest,
+    session: SessionDep,
+    settings: SettingsDep,
+) -> ScrapeAccepted:
+    """Queue a crawl of the company's own site.
+
+    Returns immediately: crawling a site takes far longer than a request should.
+    Pages appear as knowledge sources while the job runs.
+    """
+    profile = await service.get_profile(session, profile_id, workspace_id=settings.workspace_id)
+    if profile is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "company profile not found")
+
+    target = str(payload.url) if payload.url else profile.website
+    if not target:
+        raise HTTPException(
+            status.HTTP_422_UNPROCESSABLE_CONTENT,
+            "no URL given and this company has no website on file",
+        )
+
+    queue = await get_queue()
+    job = await queue.enqueue_job("scrape_website", str(profile.id), target, payload.max_pages)
+    if job is None:  # pragma: no cover - arq returns None only on a duplicate job id
+        raise HTTPException(status.HTTP_409_CONFLICT, "a scrape is already queued")
+
+    return ScrapeAccepted(job_id=job.job_id, url=target, max_pages=payload.max_pages)
+
+
+@router.get("/{profile_id}/knowledge-sources/{source_id}/content", response_model=SourceContent)
+async def read_knowledge_source_content(
+    profile_id: uuid.UUID,
+    source_id: uuid.UUID,
+    session: SessionDep,
+    settings: SettingsDep,
+    storage: StorageDep,
+) -> SourceContent:
+    source = await service.get_knowledge_source(
+        session, source_id, company_profile_id=profile_id, workspace_id=settings.workspace_id
+    )
+    if source is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "knowledge source not found")
+    return SourceContent(content=await service.read_source_content(storage, source))
+
+
+@router.put(
+    "/{profile_id}/knowledge-sources/{source_id}/content",
+    response_model=KnowledgeSourceRead,
+)
+async def update_knowledge_source_content(
+    profile_id: uuid.UUID,
+    source_id: uuid.UUID,
+    payload: SourceContent,
+    session: SessionDep,
+    settings: SettingsDep,
+    storage: StorageDep,
+) -> KnowledgeSourceRead:
+    source = await service.get_knowledge_source(
+        session, source_id, company_profile_id=profile_id, workspace_id=settings.workspace_id
+    )
+    if source is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "knowledge source not found")
+    updated = await service.update_source_content(session, storage, source, payload.content)
+    return KnowledgeSourceRead.model_validate(updated)
 
 
 @router.delete(
@@ -149,9 +221,7 @@ async def delete_knowledge_source(
 async def list_knowledge_sources(
     profile_id: uuid.UUID, session: SessionDep, settings: SettingsDep
 ) -> list[KnowledgeSourceRead]:
-    profile = await service.get_profile(
-        session, profile_id, workspace_id=settings.workspace_id
-    )
+    profile = await service.get_profile(session, profile_id, workspace_id=settings.workspace_id)
     if profile is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "company profile not found")
     return [KnowledgeSourceRead.model_validate(s) for s in profile.sources]

@@ -11,6 +11,11 @@ export function useCompanies() {
   return useQuery({
     queryKey: ["companies"],
     queryFn: () => api<CompanyProfile[]>("/companies"),
+    // Scraped pages arrive one at a time from the worker, so the source list
+    // has to refresh without the user reloading.
+    // ponytail: dumb polling. Swap for SSE when there is more live state than
+    // a source list.
+    refetchInterval: 10_000,
   });
 }
 

@@ -59,6 +59,4 @@ class WorkspaceScoped:
     the RLS policy key.
     """
 
-    workspace_id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), nullable=False, index=True
-    )
+    workspace_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), nullable=False, index=True)
