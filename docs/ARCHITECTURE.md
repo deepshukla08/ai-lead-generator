@@ -146,13 +146,18 @@ code does not re-run `pip install`.
 | Frontend outside compose | Everything in compose | Windows bind-mount hot reload is too slow |
 | `workspace_id` from day one | Add it with auth | Adding a column is cheap; back-filling is not |
 | Ruff for lint + format | Black + Flake8 + isort | One tool, one config, much faster |
+| `prospect_company` split from `lead` | One table | Research once, reuse across campaigns; fit is only meaningful per campaign |
+| VARCHAR + CHECK enums | Native Postgres enums | `ALTER TYPE` is painful to write and impossible to reverse |
+| `updated_at` DB trigger | ORM `onupdate` | ORM-level hooks do not fire for bulk UPDATE or raw SQL |
+| UUID PKs, `gen_random_uuid()` | BIGINT identity | Safe to expose in URLs, generated identically by ORM and raw SQL |
+| JSONB for agent output | Normalised columns | Shape churns with every prompt change; we read it whole, never filter inside |
 
 ## 10. Phase plan
 
 | Phase | Delivers |
 |---|---|
 | **1 ✅** | Foundation: services, Docker, Postgres + pgvector, Redis, Langfuse, health path |
-| 2 | Database schema, Alembic migrations, repositories, file upload + storage abstraction |
+| **2 ✅** | 14-table schema, Alembic migrations, storage abstraction, onboarding API |
 | 3 | Knowledge pipeline: parse → chunk → embed → retrieve. Company Knowledge Agent |
 | 4 | LangGraph supervisor, chat API with streaming, chat UI |
 | 5 | Prospecting, Research, Qualification, Opportunity agents |

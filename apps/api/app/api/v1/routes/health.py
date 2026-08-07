@@ -1,17 +1,10 @@
-from typing import Annotated
-
 import redis.asyncio as aioredis
-from fastapi import APIRouter, Depends, Response, status
+from fastapi import APIRouter, Response, status
 from sqlalchemy import text
-from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.config import ApiSettings, get_settings
-from app.core.db import get_session
+from app.api.deps import SessionDep, SettingsDep
 
 router = APIRouter(tags=["health"])
-
-SessionDep = Annotated[AsyncSession, Depends(get_session)]
-SettingsDep = Annotated[ApiSettings, Depends(get_settings)]
 
 
 @router.get("/health")

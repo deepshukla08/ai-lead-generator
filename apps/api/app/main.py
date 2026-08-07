@@ -6,7 +6,7 @@ from shared import configure_logging, get_logger
 
 from app.api.v1.router import api_router
 from app.core.config import get_settings
-from app.core.db import engine
+from app.db.session import engine
 
 settings = get_settings()
 configure_logging(

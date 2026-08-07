@@ -110,6 +110,12 @@ docker compose exec api pytest
 docker compose exec api ruff check .
 docker compose exec api ruff format .
 
+# Database
+docker compose exec api alembic upgrade head
+docker compose exec api alembic revision --autogenerate -m "add x"
+docker compose exec api alembic check          # do the models and the DB agree?
+docker compose exec api alembic downgrade -1
+
 # Frontend
 cd apps/frontend
 npm run lint
