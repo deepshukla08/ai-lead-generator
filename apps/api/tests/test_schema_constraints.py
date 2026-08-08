@@ -10,7 +10,8 @@ import pytest
 from sqlalchemy import select, text
 from sqlalchemy.exc import DBAPIError, IntegrityError
 
-from app.models import Campaign, Lead, ProspectCompany
+from app.models import Campaign, EmailMessage, EmailThread, Lead, ProspectCompany
+from app.models.enums import EmailProvider, MessageDirection, ReplyClassification
 
 WORKSPACE = uuid.UUID("00000000-0000-0000-0000-000000000001")
 
@@ -105,6 +106,107 @@ async def test_a_company_cannot_be_a_lead_twice_in_one_campaign(session) -> None
                 workspace_id=WORKSPACE,
                 campaign_id=campaign.id,
                 prospect_company_id=company.id,
+            ),
+        ]
+    )
+    with pytest.raises(IntegrityError):
+        await session.commit()
+
+
+async def test_a_conversation_reads_in_order_from_one_table(session) -> None:
+    """Outbound and inbound share a table so a thread is a read, not a merge."""
+    company = await _prospect(session, f"thread-{uuid.uuid4().hex}.com")
+    campaign = Campaign(workspace_id=WORKSPACE, name="Reply loop")
+    session.add(campaign)
+    await session.flush()
+    lead = Lead(workspace_id=WORKSPACE, campaign_id=campaign.id, prospect_company_id=company.id)
+    session.add(lead)
+    await session.flush()
+
+    thread = EmailThread(
+        workspace_id=WORKSPACE,
+        lead_id=lead.id,
+        provider=EmailProvider.GMAIL,
+        provider_thread_id=f"gmail-{uuid.uuid4().hex}",
+        subject="Throughput without another rebuild",
+    )
+    session.add(thread)
+    await session.flush()
+
+    session.add_all(
+        [
+            EmailMessage(
+                workspace_id=WORKSPACE,
+                thread_id=thread.id,
+                direction=MessageDirection.OUTBOUND,
+                provider=EmailProvider.GMAIL,
+                provider_message_id="msg-1",
+                to_email="marta@example.com",
+                body="Opening email.",
+            ),
+            EmailMessage(
+                workspace_id=WORKSPACE,
+                thread_id=thread.id,
+                direction=MessageDirection.INBOUND,
+                provider=EmailProvider.GMAIL,
+                provider_message_id="msg-2",
+                in_reply_to="msg-1",
+                from_email="marta@example.com",
+                body="What does this cost?",
+                classification=ReplyClassification.PRICING,
+                summary="Lead is interested and wants pricing.",
+            ),
+        ]
+    )
+    await session.commit()
+
+    messages = (
+        (
+            await session.execute(
+                select(EmailMessage)
+                .where(EmailMessage.thread_id == thread.id)
+                .order_by(EmailMessage.created_at)
+            )
+        )
+        .scalars()
+        .all()
+    )
+    assert [m.direction for m in messages] == [
+        MessageDirection.OUTBOUND,
+        MessageDirection.INBOUND,
+    ]
+    assert messages[1].classification == ReplyClassification.PRICING
+
+
+async def test_provider_message_ids_are_unique_per_provider(session) -> None:
+    """Webhooks arrive keyed by provider id; a duplicate must not create a second row."""
+    company = await _prospect(session, f"dupe-msg-{uuid.uuid4().hex}.com")
+    campaign = Campaign(workspace_id=WORKSPACE, name="Dupes")
+    session.add(campaign)
+    await session.flush()
+    lead = Lead(workspace_id=WORKSPACE, campaign_id=campaign.id, prospect_company_id=company.id)
+    session.add(lead)
+    await session.flush()
+    thread = EmailThread(workspace_id=WORKSPACE, lead_id=lead.id, provider=EmailProvider.RESEND)
+    session.add(thread)
+    await session.flush()
+
+    shared_id = f"resend-{uuid.uuid4().hex}"
+    session.add_all(
+        [
+            EmailMessage(
+                workspace_id=WORKSPACE,
+                thread_id=thread.id,
+                direction=MessageDirection.OUTBOUND,
+                provider=EmailProvider.RESEND,
+                provider_message_id=shared_id,
+            ),
+            EmailMessage(
+                workspace_id=WORKSPACE,
+                thread_id=thread.id,
+                direction=MessageDirection.OUTBOUND,
+                provider=EmailProvider.RESEND,
+                provider_message_id=shared_id,
             ),
         ]
     )

@@ -9,7 +9,7 @@ from app.models.activity import AgentExecution, TimelineEvent
 from app.models.campaign import Campaign, Lead
 from app.models.chat import ChatMessage, Conversation
 from app.models.company import CompanyProfile, KnowledgeChunk, KnowledgeSource
-from app.models.outreach import EmailDraft, SentEmail
+from app.models.outreach import EmailDraft, EmailMessage, EmailThread
 from app.models.prospect import Contact, ProspectCompany, Research
 
 __all__ = [
@@ -21,11 +21,12 @@ __all__ = [
     "Contact",
     "Conversation",
     "EmailDraft",
+    "EmailMessage",
+    "EmailThread",
     "KnowledgeChunk",
     "KnowledgeSource",
     "Lead",
     "ProspectCompany",
     "Research",
-    "SentEmail",
     "TimelineEvent",
 ]

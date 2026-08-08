@@ -80,8 +80,46 @@ class DraftStatus(StrEnum):
 
 
 class EmailProvider(StrEnum):
+    """SMTP can send but cannot read an inbox or follow a thread.
+
+    Reply monitoring therefore needs an API provider (Gmail, Outlook), which is
+    why the provider interface has a read side and not only `send`.
+    """
+
     SMTP = "smtp"
     RESEND = "resend"
+    GMAIL = "gmail"
+    OUTLOOK = "outlook"
+
+
+class MessageDirection(StrEnum):
+    OUTBOUND = "outbound"
+    INBOUND = "inbound"
+
+
+class ThreadStatus(StrEnum):
+    """Where a conversation stands. Drives the hand-off to a human."""
+
+    AWAITING_REPLY = "awaiting_reply"
+    REPLIED = "replied"
+    HIGH_INTENT = "high_intent"
+    HANDED_OFF = "handed_off"
+    NOT_INTERESTED = "not_interested"
+    BOUNCED = "bounced"
+    CLOSED_WON = "closed_won"
+    CLOSED_LOST = "closed_lost"
+
+
+class ReplyClassification(StrEnum):
+    """What the Reply Understanding Agent decided an inbound message means."""
+
+    INTERESTED = "interested"
+    PRICING = "pricing"
+    MEETING_REQUEST = "meeting_request"
+    FOLLOW_UP = "follow_up"
+    NOT_INTERESTED = "not_interested"
+    AUTO_REPLY = "auto_reply"
+    UNKNOWN = "unknown"
 
 
 class ChatRole(StrEnum):
@@ -106,4 +144,10 @@ class TimelineEventKind(StrEnum):
     DRAFT_APPROVED = "draft_approved"
     DRAFT_REJECTED = "draft_rejected"
     EMAIL_SENT = "email_sent"
+    EMAIL_OPENED = "email_opened"
     EMAIL_REPLIED = "email_replied"
+    EMAIL_BOUNCED = "email_bounced"
+    HIGH_INTENT = "high_intent"
+    HANDED_OFF = "handed_off"
+    DEAL_WON = "deal_won"
+    DEAL_LOST = "deal_lost"

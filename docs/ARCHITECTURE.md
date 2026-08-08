@@ -101,16 +101,29 @@ Specialists are testable in isolation, retryable in isolation, and traceable in 
 
 ```
 Supervisor
-├── Company Knowledge   — what we sell, from our documents
-├── Knowledge           — parse, chunk, embed uploads
-├── Prospecting         — find candidate companies
-├── Research            — investigate one company
-├── Qualification       — fit score + confidence + evidence
-├── Opportunity         — how our product helps this company specifically
-├── Contact             — find the right buyer
-├── Outreach            — subject, email, LinkedIn, follow-up
-├── Critic              — factuality, quality, compliance gate
-└── Campaign            — execution and metrics
+├── Business Understanding  — what we sell, from our documents and website
+├── Knowledge               — parse, chunk, embed sources
+│
+├── CSV Processing          — read, normalise, dedupe, validate
+├── Search Strategy         — turn the profile into a search plan
+├── Web Discovery           — execute the plan across search, directories, news
+├── Company Research        — investigate one company
+├── Qualification           — fit score + confidence + evidence
+├── Opportunity             — how our product helps this company specifically
+├── Contact                 — find the right buyer
+│
+├── Personalization         — the angle for this lead
+├── Outreach                — subject, email, LinkedIn, follow-up
+├── Critic                  — factuality, quality, compliance gate
+├── Email Sending           — after human approval, never before
+│
+├── Inbox Monitoring        — watch for replies on the thread
+├── Reply Understanding     — classify: interested / pricing / meeting / no
+├── Response Draft          — answer using thread history and profile
+├── High Intent Detection   — "can we meet?" → notify a human
+│
+├── Campaign                — execution and metrics
+└── Learning                — open and reply rates, human edits, closed deals
 ```
 
 Every node will declare: purpose, inputs, outputs, dependencies, tools, failure handling,
@@ -151,15 +164,20 @@ code does not re-run `pip install`.
 | `updated_at` DB trigger | ORM `onupdate` | ORM-level hooks do not fire for bulk UPDATE or raw SQL |
 | UUID PKs, `gen_random_uuid()` | BIGINT identity | Safe to expose in URLs, generated identically by ORM and raw SQL |
 | JSONB for agent output | Normalised columns | Shape churns with every prompt change; we read it whole, never filter inside |
+| One `email_messages` table, both directions | Separate sent/received tables | A conversation is one thing; the Reply agent reads it in order rather than merging two tables on timestamp |
+| Gmail/Outlook API alongside SMTP | SMTP only | SMTP can send but cannot read an inbox or follow a thread, so reply monitoring needs an API provider |
 
 ## 10. Phase plan
 
 | Phase | Delivers |
 |---|---|
 | **1 ✅** | Foundation: services, Docker, Postgres + pgvector, Redis, Langfuse, health path |
-| **2 ✅** | 14-table schema, Alembic migrations, storage abstraction, onboarding API |
-| 3 | Knowledge pipeline: parse → chunk → embed → retrieve. Company Knowledge Agent |
+| **2 ✅** | 15-table schema, Alembic migrations, storage abstraction, onboarding API |
+| **2b ✅** | Website scraper (worker + queue), knowledge CRUD, email thread/message schema |
+| 3 | Knowledge pipeline: parse → chunk → embed → retrieve. Business Understanding Agent |
 | 4 | LangGraph supervisor, chat API with streaming, chat UI |
-| 5 | Prospecting, Research, Qualification, Opportunity agents |
-| 6 | Contact discovery, Outreach generation, Critic |
-| 7 | Approval queue, email sending, campaign tracking, analytics |
+| 5 | CSV import, Search Strategy, Web Discovery, Research, Qualification, Opportunity |
+| 6 | Contact discovery, Personalization, Outreach, Critic |
+| 7 | Approval queue, sending, campaign tracking, analytics |
+| 8 | Inbox monitoring, Reply Understanding, Response Draft, high-intent hand-off |
+| 9 | Learning Agent — feeds outcomes back into qualification and outreach |
